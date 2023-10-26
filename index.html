@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Image Processing</title>
+</head>
+<body>
+    <video id="video" autoplay width="640" height="480"></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <img id="img" width="640" height="480">
+
+    <script>
+        const video = document.getElementById("video");
+        const img = document.getElementById("img");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const ws = new WebSocket("ws://localhost:8080"); // WebSocket连接到后端
+        canvas.width = 640;
+        canvas.height = 480;
+
+        navigator.mediaDevices
+            .getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((error) => {
+                console.error("Error accessing the camera: " + error);
+            });
+
+        video.addEventListener("play", () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const sendFrame = async() => {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL("image/jpeg", 0.7); // 将图像转换为JPEG格式
+                
+                await setTimeout(()=>{
+                    ws.send(imageData); // 将图像数据发送到后端
+                    requestAnimationFrame(sendFrame);
+                }, 30) //0.03毫秒一次
+
+                
+            };
+
+            sendFrame();
+        });
+
+        ws.onmessage = (event) => {
+            const imageBlob = new Blob([event.data], { type: "image/jpeg" });
+            var reader = new FileReader();
+            //直接利用Base64顯示圖片 資源消耗少
+            reader.readAsDataURL(imageBlob); 
+            reader.onloadend = function() {
+                img.src = reader.result;                
+            }
+        };
+        
+    </script>
+</body>
+</html>
